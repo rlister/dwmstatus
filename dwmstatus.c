@@ -87,13 +87,86 @@ loadavg(void)
 	return smprintf("%.2f %.2f %.2f", avgs[0], avgs[1], avgs[2]);
 }
 
+char *
+readfile(char *base, char *file)
+{
+	char *path, line[513];
+	FILE *fd;
+
+	memset(line, 0, sizeof(line));
+
+	path = smprintf("%s/%s", base, file);
+	fd = fopen(path, "r");
+	free(path);
+	if (fd == NULL)
+		return NULL;
+
+	if (fgets(line, sizeof(line)-1, fd) == NULL)
+		return NULL;
+	fclose(fd);
+
+	return smprintf("%s", line);
+}
+
+char *
+getbattery(char *base)
+{
+	char *co, status;
+	int descap, remcap;
+
+	descap = -1;
+	remcap = -1;
+
+	co = readfile(base, "present");
+	if (co == NULL)
+		return smprintf("");
+	if (co[0] != '1') {
+		free(co);
+		return smprintf("not present");
+	}
+	free(co);
+
+	co = readfile(base, "charge_full_design");
+	if (co == NULL) {
+		co = readfile(base, "energy_full_design");
+		if (co == NULL)
+			return smprintf("");
+	}
+	sscanf(co, "%d", &descap);
+	free(co);
+
+	co = readfile(base, "charge_now");
+	if (co == NULL) {
+		co = readfile(base, "energy_now");
+		if (co == NULL)
+			return smprintf("");
+	}
+	sscanf(co, "%d", &remcap);
+	free(co);
+
+	co = readfile(base, "status");
+	if (!strncmp(co, "Discharging", 11)) {
+		status = '-';
+	} else if(!strncmp(co, "Charging", 8)) {
+		status = '+';
+	} else {
+		status = '?';
+	}
+
+	if (remcap < 0 || descap < 0)
+		return smprintf("invalid");
+
+	return smprintf("%.0f%%%c", ((float)remcap / (float)descap) * 100, status);
+}
+
 int
 main(void)
 {
 	char *status;
 	char *avgs;
+  char *bat;
 	char *tmutc;
-        char *tmest;
+  char *tmest;
 
 	if (!(dpy = XOpenDisplay(NULL))) {
 		fprintf(stderr, "dwmstatus: cannot open display.\n");
@@ -102,13 +175,15 @@ main(void)
 
 	for (;;sleep(60)) {
 		avgs = loadavg();
+		bat = getbattery("/sys/class/power_supply/BAT0");
 		tmutc = mktimes("%H:%M %Z", tzutc);
                 tmest = mktimes("%a %d %b %H:%M %Z", "US/Eastern");
 
-                status = smprintf("%s | %s | %s", avgs, tmutc, tmest);
+                status = smprintf("B:%s | %s | %s | %s", bat, avgs, tmutc, tmest);
 		setstatus(status);
 
 		free(avgs);
+                free(bat);
 		free(tmutc);
 		free(tmest);
 		free(status);
