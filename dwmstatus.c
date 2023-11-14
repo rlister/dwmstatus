@@ -177,13 +177,13 @@ main(void)
 		avgs = loadavg();
 		bat = getbattery("/sys/class/power_supply/BAT0");
 		tmutc = mktimes("%H:%M %Z", tzutc);
-                tmest = mktimes("%a %d %b %H:%M %Z", "US/Eastern");
+    tmest = mktimes("%a %d %b %H:%M %Z", "US/Eastern");
 
-                status = smprintf("B:%s | %s | %s | %s", bat, avgs, tmutc, tmest);
+    status = smprintf("B:%s | %s | %s | %s", bat, avgs, tmutc, tmest);
 		setstatus(status);
 
 		free(avgs);
-                free(bat);
+    free(bat);
 		free(tmutc);
 		free(tmest);
 		free(status);
